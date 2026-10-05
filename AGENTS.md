@@ -136,19 +136,22 @@ Never run `pnpm run deploy` or any `--remote` D1 command unless the user asks.
 
 ### Git
 
-- Never commit directly to `main`; branch, then PR.
-- Commit only when asked. Never commit secrets (`.dev.vars`, keys, tokens) — warn and exclude.
+- **Never commit without confirmation.** Before every commit, show the user the files and a summary of the changes, and wait for an explicit "yes". Finishing a task, passing checks, or an earlier approval is not confirmation — ask each time.
+- **Never push to `main`.** All work goes on a topic branch; changes reach `main` only by merging a PR. Don't merge PRs yourself unless the user explicitly asks.
+- Never commit secrets (`.dev.vars`, keys, tokens) — warn and exclude.
 - Stage only the files belonging to the change. No blanket `git add .` / `git add -A`.
 - Never change git config, skip hooks, or force-push `main`.
 - Before renaming or changing a signature, find every call site first.
 
 ### Raising a PR
 
-Asking to ship / commit / raise a PR is permission to branch, commit, push, and run `gh pr create`.
+Committing still needs confirmation (see Git above). Once the user confirms, you may branch, commit, push the topic branch, and run `gh pr create`. The PR is merged into `main` by the user.
 
 **1. Inspect** — `git status`, `git diff` (staged and unstaged), `git branch -vv`, `git log -8 --oneline`, and remote sync state. If there is nothing to commit and nothing unpushed, stop.
 
-**2. Branch** — work lands on a topic branch cut from latest `main`: `feat/…` / `fix/…` / `chore/…`. If the current branch isn't right: stash, `git checkout main`, `git pull --ff-only`, branch, `git stash pop`.
+**2. Branch** — work lands on a topic branch cut from latest `main`: `feat/…` / `fix/…` / `chore/…` / `docs/…`. If the current branch isn't right: stash, `git checkout main`, `git pull --ff-only`, branch, `git stash pop`. Never commit or push on `main`.
+
+**2a. Confirm** — show the user the files to be committed, a short summary, and the proposed commit message. Wait for an explicit "yes" before committing.
 
 **3. Commit** — Conventional Commits, one primary type:
 
