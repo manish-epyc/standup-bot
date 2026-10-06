@@ -107,6 +107,15 @@ export async function getChannelMemberIds(token: string, channel: string): Promi
   return members;
 }
 
+type FileInfoResponse = SlackResponse & {
+  file: { id: string; mimetype?: string; url_private_download?: string };
+};
+
+export async function getFileInfo(token: string, fileId: string): Promise<FileInfoResponse["file"]> {
+  const { file } = await call<FileInfoResponse>(token, "files.info", { query: { file: fileId } });
+  return file;
+}
+
 export async function downloadFile(
   token: string,
   url: string,

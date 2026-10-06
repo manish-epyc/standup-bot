@@ -41,6 +41,11 @@ export async function getUser(db: D1Database, id: string): Promise<User | null> 
   return db.prepare("SELECT * FROM users WHERE id = ?").bind(id).first<User>();
 }
 
+export async function getUsers(db: D1Database): Promise<User[]> {
+  const { results } = await db.prepare("SELECT * FROM users ORDER BY name").all<User>();
+  return results;
+}
+
 export async function upsertUser(db: D1Database, id: string, name: string): Promise<void> {
   await db
     .prepare(
@@ -100,19 +105,22 @@ export async function getSummary(db: D1Database, date: string): Promise<Summary 
   return db.prepare("SELECT * FROM summaries WHERE date = ?").bind(date).first<Summary>();
 }
 
-/** Returns false when a summary for the date already exists. */
-export async function saveSummary(
-  db: D1Database,
-  date: string,
-  summaryJson: string,
-  slackTs: string | null,
-): Promise<boolean> {
+/**
+ * Claims the day's summary before posting, so overlapping runs (cron + manual) post once.
+ * Returns false when another run already claimed it.
+ */
+export async function claimSummary(db: D1Database, date: string, summaryJson: string): Promise<boolean> {
   const result = await db
-    .prepare(
-      `INSERT INTO summaries (date, summary_json, slack_ts) VALUES (?, ?, ?)
-       ON CONFLICT (date) DO NOTHING`,
-    )
-    .bind(date, summaryJson, slackTs)
+    .prepare("INSERT INTO summaries (date, summary_json) VALUES (?, ?) ON CONFLICT (date) DO NOTHING")
+    .bind(date, summaryJson)
     .run();
   return result.meta.changes > 0;
+}
+
+export async function setSummarySlackTs(db: D1Database, date: string, slackTs: string): Promise<void> {
+  await db.prepare("UPDATE summaries SET slack_ts = ? WHERE date = ?").bind(slackTs, date).run();
+}
+
+export async function releaseSummaryClaim(db: D1Database, date: string): Promise<void> {
+  await db.prepare("DELETE FROM summaries WHERE date = ? AND slack_ts IS NULL").bind(date).run();
 }
