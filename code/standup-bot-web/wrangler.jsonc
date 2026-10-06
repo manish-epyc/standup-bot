@@ -1,7 +1,7 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "standup-bot",
-	"main": ".open-next/worker.js",
+	"main": "custom-worker.ts",
 	"compatibility_date": "2026-10-01",
 	"compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
 	"assets": {
@@ -20,6 +20,10 @@
 	"vars": {
 		"STANDUP_CHANNEL_ID": "",
 		"TEAM_TIMEZONE": "Asia/Kolkata"
+	},
+	"triggers": {
+		// UTC. 09:30 IST reminder, 10:00 IST summary. Keep in sync with CRON_ROUTES in custom-worker.ts.
+		"crons": ["0 4 * * MON-FRI", "30 4 * * MON-FRI"]
 	},
 	"observability": {
 		"enabled": true

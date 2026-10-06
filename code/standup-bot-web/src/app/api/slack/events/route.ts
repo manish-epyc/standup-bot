@@ -38,7 +38,7 @@ async function handleEvent(env: CloudflareEnv, eventId: string, event: Record<st
     const route = routeMessage(event, env.STANDUP_CHANNEL_ID);
     switch (route.kind) {
       case "text":
-        await handleTextUpdate(env, route.event, route.userId);
+        await handleTextUpdate(env, route.event, route.userId, route.text);
         break;
       case "voice":
         await handleVoiceUpdate(env, route.event, route.userId, route.file);
