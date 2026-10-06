@@ -3,3 +3,5 @@ SLACK_BOT_TOKEN=xoxb-your-bot-token
 SLACK_SIGNING_SECRET=your-signing-secret
 GROQ_API_KEY=gsk_your-groq-key
 CRON_SECRET=any-long-random-string
+# Overrides the empty value in wrangler.jsonc for local development.
+STANDUP_CHANNEL_ID=C0123456789
