@@ -1,0 +1,21 @@
+display_information:
+  name: Skip the Standup
+  description: Async voice standups. Post a short clip, get a transcript and one daily team summary.
+  background_color: "#1f2937"
+features:
+  bot_user:
+    display_name: Skip the Standup
+    always_online: true
+oauth_config:
+  scopes:
+    bot:
+      - channels:history
+      - channels:read
+      - chat:write
+      - files:read
+      - reactions:write
+      - users:read
+settings:
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false

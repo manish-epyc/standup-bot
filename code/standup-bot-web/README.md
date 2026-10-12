@@ -14,6 +14,32 @@ pnpm dev                              # http://localhost:3000
 
 Check: `GET /api/health` should list the D1 tables.
 
+## Slack app setup (test workspace)
+
+1. **Workspace** — create a free test workspace at https://slack.com/get-started#/createnew (or use an existing one where you can install apps).
+2. **Channel** — create a public channel, e.g. `#standup-test`.
+3. **Create the app** — https://api.slack.com/apps → **Create New App** → **From a manifest** → pick the workspace → paste [`slack-manifest.yml`](slack-manifest.yml) (YAML tab) → **Create**.
+4. **Install** — **Install App** → **Install to Workspace** → **Allow**.
+5. **Copy secrets into `.dev.vars`**
+   - **OAuth & Permissions → Bot User OAuth Token** (`xoxb-…`) → `SLACK_BOT_TOKEN`
+   - **Basic Information → App Credentials → Signing Secret** → `SLACK_SIGNING_SECRET`
+6. **Channel ID** — in Slack, open the channel → click its name → bottom of the **About** tab (`C…`) → `STANDUP_CHANNEL_ID` in `.dev.vars`.
+7. **Invite the bot** — in the channel: `/invite @Skip the Standup`.
+8. **Groq key** — https://console.groq.com/keys → **Create API Key** → `GROQ_API_KEY` in `.dev.vars`.
+9. Restart `pnpm dev` so it picks up `.dev.vars`.
+
+### Enable events (after the events endpoint exists)
+
+Slack verifies the Request URL as soon as it is saved, so this step needs the app running and reachable:
+
+1. `pnpm dev`, then in another terminal `cloudflared tunnel --url http://localhost:3000`
+2. App settings → **Event Subscriptions** → **On** → Request URL: `https://<tunnel>/api/slack/events` → wait for **Verified**
+3. **Subscribe to bot events** → add `message.channels` → **Save Changes** → reinstall the app if Slack asks.
+
+A quick tunnel gets a new URL every run; update the Request URL each time (or use a named tunnel).
+
+If the standup channel is **private**, add the `groups:history` and `groups:read` scopes and the `message.groups` event.
+
 ## Scripts
 
 | Script | What it does |
