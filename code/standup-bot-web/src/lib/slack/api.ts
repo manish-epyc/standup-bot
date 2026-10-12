@@ -71,22 +71,58 @@ export async function addReaction(
 
 export type SlackUser = { id: string; name: string; isBot: boolean };
 
-type UsersInfoResponse = SlackResponse & {
-  user: {
-    id: string;
-    name: string;
-    is_bot: boolean;
-    real_name?: string;
-    profile?: { display_name?: string; real_name?: string };
-  };
+type RawSlackUser = {
+  id: string;
+  name: string;
+  is_bot: boolean;
+  deleted?: boolean;
+  real_name?: string;
+  profile?: { display_name?: string; real_name?: string };
 };
 
-export async function getUserInfo(token: string, userId: string): Promise<SlackUser> {
-  const { user } = await call<UsersInfoResponse>(token, "users.info", { query: { user: userId } });
+function toSlackUser(user: RawSlackUser): SlackUser {
   const name =
     user.profile?.display_name || user.profile?.real_name || user.real_name || user.name;
   // Slackbot has is_bot: false but must never count as a team member.
   return { id: user.id, name, isBot: user.is_bot || user.id === "USLACKBOT" };
+}
+
+export async function getUserInfo(token: string, userId: string): Promise<SlackUser> {
+  const { user } = await call<SlackResponse & { user: RawSlackUser }>(token, "users.info", {
+    query: { user: userId },
+  });
+  return toSlackUser(user);
+}
+
+type UsersListResponse = SlackResponse & {
+  members: RawSlackUser[];
+  response_metadata?: { next_cursor?: string };
+};
+
+/** Active humans in the workspace (deactivated accounts and bots excluded). */
+export async function listWorkspaceUsers(token: string): Promise<SlackUser[]> {
+  const users: SlackUser[] = [];
+  let cursor = "";
+  do {
+    const data = await call<UsersListResponse>(token, "users.list", {
+      query: { limit: "200", ...(cursor && { cursor }) },
+    });
+    for (const raw of data.members) {
+      const user = toSlackUser(raw);
+      if (!raw.deleted && !user.isBot) users.push(user);
+    }
+    cursor = data.response_metadata?.next_cursor ?? "";
+  } while (cursor);
+  return users;
+}
+
+type ConversationsInfoResponse = SlackResponse & {
+  channel: { name?: string; topic?: { value?: string } };
+};
+
+export async function getChannelInfo(token: string, channel: string): Promise<{ name: string; topic: string }> {
+  const data = await call<ConversationsInfoResponse>(token, "conversations.info", { query: { channel } });
+  return { name: data.channel.name ?? "", topic: data.channel.topic?.value ?? "" };
 }
 
 type MembersResponse = SlackResponse & {

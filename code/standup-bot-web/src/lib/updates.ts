@@ -1,3 +1,4 @@
+import { buildTranscriptionHints } from "@/lib/ai/hints";
 import { transcribe } from "@/lib/ai/transcribe";
 import { teamDate } from "@/lib/date";
 import { upsertUpdate } from "@/lib/db";
@@ -48,8 +49,11 @@ export async function handleVoiceUpdate(
     }
     if (!url) throw new Error("file has no download URL");
 
-    const audio = await downloadFile(token, url);
-    transcript = await transcribe(env.GROQ_API_KEY, audio.data, mimetype ?? audio.contentType);
+    const [audio, hints] = await Promise.all([
+      downloadFile(token, url),
+      buildTranscriptionHints(token, event.channel),
+    ]);
+    transcript = await transcribe(env.GROQ_API_KEY, audio.data, mimetype ?? audio.contentType, hints);
 
     await upsertUpdate(env.DB, {
       userId,

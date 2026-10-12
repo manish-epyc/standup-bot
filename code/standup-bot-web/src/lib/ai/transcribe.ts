@@ -29,13 +29,19 @@ export class TranscriptionError extends Error {
   }
 }
 
-export async function transcribe(apiKey: string, audio: ArrayBuffer, mimetype: string): Promise<string> {
+export async function transcribe(
+  apiKey: string,
+  audio: ArrayBuffer,
+  mimetype: string,
+  hints = "",
+): Promise<string> {
   if (!apiKey) throw new TranscriptionError("GROQ_API_KEY is not set");
 
   const form = new FormData();
   form.append("file", new Blob([audio], { type: mimetype }), fileNameForMimetype(mimetype));
   form.append("model", MODEL);
   form.append("response_format", "json");
+  if (hints) form.append("prompt", hints);
 
   const response = await fetch(GROQ_TRANSCRIPTIONS_URL, {
     method: "POST",
