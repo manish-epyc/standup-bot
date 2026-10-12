@@ -12,20 +12,21 @@ import type { StoredSummary } from "@/lib/dashboard";
 type SummaryCardProps = {
   summary: StoredSummary | null;
   namesById: Map<string, string>;
+  title?: string;
 };
 
 function plural(count: number, noun: string): string {
   return `${count} ${noun}${count === 1 ? "" : "s"}`;
 }
 
-export function SummaryCard({ summary, namesById }: SummaryCardProps) {
+export function SummaryCard({ summary, namesById, title = "Today's summary" }: SummaryCardProps) {
   const nameOf = (id: string) => namesById.get(id) ?? id;
 
   if (!summary) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Today&apos;s summary</CardTitle>
+          <CardTitle>{title}</CardTitle>
           <CardDescription>The summary is posted to Slack at 10:00 IST on weekdays.</CardDescription>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">No summary yet.</CardContent>
@@ -36,7 +37,7 @@ export function SummaryCard({ summary, namesById }: SummaryCardProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Today&apos;s summary</CardTitle>
+        <CardTitle>{title}</CardTitle>
         <CardDescription>
           {plural(summary.people.length, "update")} · {plural(summary.blockers.length, "blocker")} ·{" "}
           {summary.missing.length} not submitted
@@ -75,6 +76,11 @@ export function SummaryCard({ summary, namesById }: SummaryCardProps) {
                 <li key={`${blocker.user_id}-${index}`} className="flex flex-wrap items-start gap-2">
                   <Badge variant="destructive">{nameOf(blocker.user_id)}</Badge>
                   <span>{blocker.text}</span>
+                  {blocker.helper_ids && blocker.helper_ids.length > 0 && (
+                    <span className="text-muted-foreground">
+                      Can help: {blocker.helper_ids.map(nameOf).join(", ")}
+                    </span>
+                  )}
                 </li>
               ))}
             </ul>

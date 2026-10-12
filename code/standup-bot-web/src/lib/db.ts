@@ -15,6 +15,7 @@ export type Update = {
   transcript: string;
   slack_ts: string;
   file_id: string | null;
+  duration_ms: number | null;
   created_at: string;
 };
 
@@ -35,6 +36,7 @@ export type NewUpdate = {
   transcript: string;
   slackTs: string;
   fileId?: string | null;
+  durationMs?: number | null;
 };
 
 export async function getUser(db: D1Database, id: string): Promise<User | null> {
@@ -56,17 +58,20 @@ export async function upsertUser(db: D1Database, id: string, name: string): Prom
     .run();
 }
 
-export async function upsertUpdate(db: D1Database, update: NewUpdate): Promise<void> {
-  await db
+/** Stores the update and returns its row id, which stays the same when a later post replaces it. */
+export async function upsertUpdate(db: D1Database, update: NewUpdate): Promise<number> {
+  const row = await db
     .prepare(
-      `INSERT INTO updates (user_id, date, source, transcript, slack_ts, file_id)
-       VALUES (?, ?, ?, ?, ?, ?)
+      `INSERT INTO updates (user_id, date, source, transcript, slack_ts, file_id, duration_ms)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT (user_id, date) DO UPDATE SET
          source = excluded.source,
          transcript = excluded.transcript,
          slack_ts = excluded.slack_ts,
          file_id = excluded.file_id,
-         created_at = datetime('now')`,
+         duration_ms = excluded.duration_ms,
+         created_at = datetime('now')
+       RETURNING id`,
     )
     .bind(
       update.userId,
@@ -75,8 +80,93 @@ export async function upsertUpdate(db: D1Database, update: NewUpdate): Promise<v
       update.transcript,
       update.slackTs,
       update.fileId ?? null,
+      update.durationMs ?? null,
     )
+    .first<{ id: number }>();
+  if (!row) throw new Error("update upsert returned no row");
+  return row.id;
+}
+
+export async function getUpdateBySlackTs(db: D1Database, slackTs: string): Promise<Update | null> {
+  return db.prepare("SELECT * FROM updates WHERE slack_ts = ?").bind(slackTs).first<Update>();
+}
+
+/** Applies only while the update still belongs to `slackTs`, so a correction can't overwrite a newer post. */
+export async function setUpdateTranscript(
+  db: D1Database,
+  updateId: number,
+  slackTs: string,
+  transcript: string,
+): Promise<boolean> {
+  const result = await db
+    .prepare("UPDATE updates SET transcript = ? WHERE id = ? AND slack_ts = ?")
+    .bind(transcript, updateId, slackTs)
     .run();
+  return result.meta.changes > 0;
+}
+
+export type Blocker = {
+  id: number;
+  update_id: number;
+  user_id: string;
+  date: string;
+  text: string;
+  helper_ids: string;
+  status: "open" | "resolved";
+  opened_on: string;
+  resolved_on: string | null;
+};
+
+/**
+ * Replaces the user's blocker for the day with the one extracted from `updateId`, or removes it
+ * when `blocker` is null. Both only apply while the update still has `slackTs`: extraction runs
+ * after the post is acked, so a slower run for an earlier post must not overwrite a newer one.
+ */
+export async function replaceBlocker(
+  db: D1Database,
+  target: { updateId: number; slackTs: string; userId: string; date: string },
+  blocker: { text: string; helperIds: string[] } | null,
+): Promise<void> {
+  if (!blocker) {
+    await db
+      .prepare(
+        `DELETE FROM blockers WHERE user_id = ? AND date = ?
+         AND EXISTS (SELECT 1 FROM updates WHERE id = ? AND slack_ts = ?)`,
+      )
+      .bind(target.userId, target.date, target.updateId, target.slackTs)
+      .run();
+    return;
+  }
+  await db
+    .prepare(
+      `INSERT INTO blockers (update_id, user_id, date, text, helper_ids, opened_on)
+       SELECT id, user_id, date, ?, ?, date FROM updates WHERE id = ? AND slack_ts = ?
+       ON CONFLICT (user_id, date) DO UPDATE SET
+         update_id = excluded.update_id,
+         text = excluded.text,
+         helper_ids = excluded.helper_ids,
+         status = 'open',
+         resolved_on = NULL`,
+    )
+    .bind(blocker.text, JSON.stringify(blocker.helperIds), target.updateId, target.slackTs)
+    .run();
+}
+
+export async function getBlockersForDate(db: D1Database, date: string): Promise<Blocker[]> {
+  const { results } = await db
+    .prepare("SELECT * FROM blockers WHERE date = ? AND status = 'open' ORDER BY id")
+    .bind(date)
+    .all<Blocker>();
+  return results;
+}
+
+export function parseHelperIds(json: string): string[] {
+  try {
+    const parsed: unknown = JSON.parse(json);
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : [];
+  } catch {
+    return [];
+  }
 }
 
 export async function getUpdatesForDate(db: D1Database, date: string): Promise<UpdateWithName[]> {
@@ -89,6 +179,36 @@ export async function getUpdatesForDate(db: D1Database, date: string): Promise<U
     )
     .bind(date)
     .all<UpdateWithName>();
+  return results;
+}
+
+export async function getUpdateDates(
+  db: D1Database,
+  limit: number,
+): Promise<{ date: string; count: number }[]> {
+  const { results } = await db
+    .prepare("SELECT date, COUNT(*) AS count FROM updates GROUP BY date ORDER BY date DESC LIMIT ?")
+    .bind(limit)
+    .all<{ date: string; count: number }>();
+  return results;
+}
+
+export async function getUpdatesForUser(db: D1Database, userId: string, limit: number): Promise<Update[]> {
+  const { results } = await db
+    .prepare("SELECT * FROM updates WHERE user_id = ? ORDER BY date DESC LIMIT ?")
+    .bind(userId, limit)
+    .all<Update>();
+  return results;
+}
+
+export async function getUpdateDurationsSince(
+  db: D1Database,
+  fromDate: string,
+): Promise<{ date: string; source: UpdateSource; duration_ms: number | null }[]> {
+  const { results } = await db
+    .prepare("SELECT date, source, duration_ms FROM updates WHERE date >= ?")
+    .bind(fromDate)
+    .all<{ date: string; source: UpdateSource; duration_ms: number | null }>();
   return results;
 }
 

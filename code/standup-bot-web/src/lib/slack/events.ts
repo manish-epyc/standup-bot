@@ -1,6 +1,7 @@
 export type SlackFile = {
   id: string;
   mimetype?: string;
+  duration_ms?: number;
   url_private_download?: string;
   name?: string;
 };
@@ -24,6 +25,7 @@ export type SlackEnvelope =
 export type MessageRoute =
   | { kind: "voice"; event: SlackMessageEvent; userId: string; file: SlackFile }
   | { kind: "text"; event: SlackMessageEvent; userId: string; text: string }
+  | { kind: "correction"; event: SlackMessageEvent; userId: string; threadTs: string; text: string }
   | { kind: "ignore"; reason: string };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -65,10 +67,18 @@ export function routeMessage(event: Record<string, unknown>, standupChannelId: s
   }
   if (event.bot_id || event.subtype === "bot_message") return { kind: "ignore", reason: "bot" };
   if (!HANDLED_SUBTYPES.has(event.subtype)) return { kind: "ignore", reason: `subtype_${event.subtype}` };
-  if (event.thread_ts && event.thread_ts !== event.ts) return { kind: "ignore", reason: "thread_reply" };
   if (!event.user) return { kind: "ignore", reason: "no_user" };
 
   const media = Array.isArray(event.files) ? event.files.find(isMediaFile) : undefined;
+
+  const threadTs = event.thread_ts;
+  if (threadTs && threadTs !== event.ts) {
+    // Only plain-text replies can be corrections; whether the thread is the sender's own voice update is checked against the DB.
+    const reply = event.text?.trim();
+    if (media || !reply) return { kind: "ignore", reason: "thread_reply" };
+    return { kind: "correction", event, userId: event.user, threadTs, text: reply };
+  }
+
   if (media) return { kind: "voice", event, userId: event.user, file: media };
 
   const text = event.text?.trim();

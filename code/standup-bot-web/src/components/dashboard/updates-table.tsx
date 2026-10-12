@@ -21,9 +21,10 @@ import { slackTsToDate } from "@/lib/slack/text";
 type UpdatesTableProps = {
   updates: UpdateWithName[];
   timeZone: string;
+  dayLabel?: string;
 };
 
-export function UpdatesTable({ updates, timeZone }: UpdatesTableProps) {
+export function UpdatesTable({ updates, timeZone, dayLabel = "today" }: UpdatesTableProps) {
   const formatTime = new Intl.DateTimeFormat("en-GB", {
     hour: "2-digit",
     minute: "2-digit",
@@ -36,8 +37,8 @@ export function UpdatesTable({ updates, timeZone }: UpdatesTableProps) {
         <CardTitle>Updates</CardTitle>
         <CardDescription>
           {updates.length === 0
-            ? "Nobody has posted yet today."
-            : `${updates.length} ${updates.length === 1 ? "person has" : "people have"} posted today.`}
+            ? `Nobody posted ${dayLabel}.`
+            : `${updates.length} ${updates.length === 1 ? "person" : "people"} posted ${dayLabel}.`}
         </CardDescription>
       </CardHeader>
       {updates.length > 0 && (

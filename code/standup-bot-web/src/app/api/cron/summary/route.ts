@@ -1,5 +1,6 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { summarize } from "@/lib/ai/summarize";
+import { getSummaryBlockers } from "@/lib/blockers";
 import { isAuthorizedCronRequest } from "@/lib/cron-auth";
 import { isWeekend, teamDate } from "@/lib/date";
 import {
@@ -40,12 +41,14 @@ export async function POST(request: Request) {
     updates.map((u) => ({ userId: u.user_id, name: u.user_name, transcript: u.transcript })),
   );
 
-  if (!(await claimSummary(env.DB, date, JSON.stringify({ ...summary, missing: missingIds })))) {
+  const blockers = await getSummaryBlockers(env.DB, date);
+
+  if (!(await claimSummary(env.DB, date, JSON.stringify({ ...summary, blockers, missing: missingIds })))) {
     return Response.json({ date, skipped: "already_posted" });
   }
 
   const namesById = new Map(updates.map((u) => [u.user_id, u.user_name]));
-  const message = buildSummaryMessage(date, summary, namesById, missingIds);
+  const message = buildSummaryMessage(date, summary, blockers, namesById, missingIds);
   try {
     const { ts } = await postMessage(env.SLACK_BOT_TOKEN, { channel: env.STANDUP_CHANNEL_ID, ...message });
     await setSummarySlackTs(env.DB, date, ts);

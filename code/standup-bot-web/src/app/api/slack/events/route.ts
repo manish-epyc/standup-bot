@@ -2,7 +2,7 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { markEventProcessed } from "@/lib/db";
 import { parseEnvelope, routeMessage } from "@/lib/slack/events";
 import { verifySlackSignature } from "@/lib/slack/verify";
-import { handleTextUpdate, handleVoiceUpdate } from "@/lib/updates";
+import { handleTextUpdate, handleTranscriptCorrection, handleVoiceUpdate } from "@/lib/updates";
 
 export async function POST(request: Request) {
   const { env, ctx } = getCloudflareContext();
@@ -39,6 +39,9 @@ async function handleEvent(env: CloudflareEnv, eventId: string, event: Record<st
     switch (route.kind) {
       case "text":
         await handleTextUpdate(env, route.event, route.userId, route.text);
+        break;
+      case "correction":
+        await handleTranscriptCorrection(env, route.event, route.userId, route.threadTs, route.text);
         break;
       case "voice":
         await handleVoiceUpdate(env, route.event, route.userId, route.file);

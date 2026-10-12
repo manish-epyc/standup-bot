@@ -1,7 +1,8 @@
 import { buildTranscriptionHints } from "@/lib/ai/hints";
 import { transcribe } from "@/lib/ai/transcribe";
 import { teamDate } from "@/lib/date";
-import { upsertUpdate } from "@/lib/db";
+import { recordBlocker, type StoredUpdate } from "@/lib/blockers";
+import { getUpdateBySlackTs, setUpdateTranscript, upsertUpdate } from "@/lib/db";
 import { addReaction, downloadFile, getFileInfo, postMessage } from "@/lib/slack/api";
 import type { SlackFile, SlackMessageEvent } from "@/lib/slack/events";
 import { decodeSlackText, escapeSlackText, slackTsToDate } from "@/lib/slack/text";
@@ -15,15 +16,36 @@ export async function handleTextUpdate(
 ): Promise<void> {
   // updates.user_id references users.id, so the user row must exist first.
   await ensureUserName(env.DB, env.SLACK_BOT_TOKEN, userId);
-  await upsertUpdate(env.DB, {
-    userId,
-    // Date from the message itself, not processing time, so a post at 23:59 IST stays on its day.
-    date: teamDate(slackTsToDate(event.ts), env.TEAM_TIMEZONE),
-    source: "text",
-    transcript: decodeSlackText(text),
-    slackTs: event.ts,
-  });
+  // Date from the message itself, not processing time, so a post at 23:59 IST stays on its day.
+  const date = teamDate(slackTsToDate(event.ts), env.TEAM_TIMEZONE);
+  const transcript = decodeSlackText(text);
+  const updateId = await upsertUpdate(env.DB, { userId, date, source: "text", transcript, slackTs: event.ts });
   await addReaction(env.SLACK_BOT_TOKEN, event.channel, event.ts, "white_check_mark");
+  await recordBlocker(env, event.channel, { updateId, slackTs: event.ts, userId, date, transcript });
+}
+
+export async function handleTranscriptCorrection(
+  env: CloudflareEnv,
+  event: SlackMessageEvent,
+  userId: string,
+  threadTs: string,
+  text: string,
+): Promise<void> {
+  const update = await getUpdateBySlackTs(env.DB, threadTs);
+  // Only a voice update has a bot transcript to correct, only its author may change it, and only on its own day.
+  if (!update || update.source !== "voice" || update.user_id !== userId) return;
+  if (update.date !== teamDate(new Date(), env.TEAM_TIMEZONE)) return;
+
+  const transcript = decodeSlackText(text);
+  if (!(await setUpdateTranscript(env.DB, update.id, threadTs, transcript))) return;
+  await addReaction(env.SLACK_BOT_TOKEN, event.channel, event.ts, "white_check_mark");
+  await recordBlocker(env, event.channel, {
+    updateId: update.id,
+    slackTs: threadTs,
+    userId,
+    date: update.date,
+    transcript,
+  });
 }
 
 const VOICE_FALLBACK =
@@ -37,6 +59,7 @@ export async function handleVoiceUpdate(
 ): Promise<void> {
   const token = env.SLACK_BOT_TOKEN;
   let transcript: string;
+  let stored: StoredUpdate;
   try {
     await ensureUserName(env.DB, token, userId);
 
@@ -55,14 +78,17 @@ export async function handleVoiceUpdate(
     ]);
     transcript = await transcribe(env.GROQ_API_KEY, audio.data, mimetype ?? audio.contentType, hints);
 
-    await upsertUpdate(env.DB, {
+    const date = teamDate(slackTsToDate(event.ts), env.TEAM_TIMEZONE);
+    const updateId = await upsertUpdate(env.DB, {
       userId,
-      date: teamDate(slackTsToDate(event.ts), env.TEAM_TIMEZONE),
+      date,
       source: "voice",
       transcript,
       slackTs: event.ts,
       fileId: file.id,
+      durationMs: file.duration_ms,
     });
+    stored = { updateId, slackTs: event.ts, userId, date, transcript };
   } catch (error) {
     console.error("voice update failed", { ts: event.ts, fileId: file.id, error: String(error) });
     await replyInThread(token, event, VOICE_FALLBACK);
@@ -70,6 +96,7 @@ export async function handleVoiceUpdate(
   }
 
   await replyInThread(token, event, `:memo: *Transcript*\n${escapeSlackText(transcript)}`);
+  await recordBlocker(env, event.channel, stored);
 }
 
 async function replyInThread(token: string, event: SlackMessageEvent, text: string): Promise<void> {

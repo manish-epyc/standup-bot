@@ -100,7 +100,7 @@ When an effect is required, always clean up.
 
 - Events arrive at `/api/slack/events`. Verify the Slack signature + timestamp before anything else.
 - Ack within 3 seconds; heavy work in `waitUntil`. Dedupe by `event_id` (`processed_events`).
-- Ignore bot messages (including our own), other channels, and (in MVP) thread replies.
+- Ignore bot messages (including our own) and other channels. Thread replies are ignored except a plain-text reply in the author's own voice-update thread on the same day, which corrects that update's transcript.
 
 ### Code
 

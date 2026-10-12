@@ -1,8 +1,13 @@
 import type { DailySummary } from "@/lib/ai/summarize";
+import type { SummaryBlocker } from "@/lib/blockers";
 import { formatTeamDate } from "@/lib/date";
 import { escapeSlackText } from "@/lib/slack/text";
 
 type Block = Record<string, unknown>;
+
+function plural(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? "" : "s"}`;
+}
 
 // Slack rejects section text over 3000 characters.
 const MAX_SECTION = 2900;
@@ -24,6 +29,7 @@ function sections(title: string, lines: string[]): Block[] {
 export function buildSummaryMessage(
   date: string,
   summary: DailySummary,
+  blockers: SummaryBlocker[],
   namesById: Map<string, string>,
   missingIds: string[],
 ): { text: string; blocks: Block[] } {
@@ -32,7 +38,10 @@ export function buildSummaryMessage(
   const updateLines = summary.people.map(
     (p) => `• *${escapeSlackText(namesById.get(p.user_id) ?? "Someone")}* — ${escapeSlackText(p.line)}`,
   );
-  const blockerLines = summary.blockers.map((b) => `• <@${b.user_id}> — ${escapeSlackText(b.text)}`);
+  const blockerLines = blockers.map((b) => {
+    const helpers = b.helper_ids.length ? ` _(can help: ${b.helper_ids.map((id) => `<@${id}>`).join(", ")})_` : "";
+    return `• <@${b.user_id}> — ${escapeSlackText(b.text)}${helpers}`;
+  });
 
   const blocks: Block[] = [
     { type: "header", text: { type: "plain_text", text: title } },
@@ -51,6 +60,6 @@ export function buildSummaryMessage(
     });
   }
 
-  const text = `${title}: ${summary.people.length} updates, ${summary.blockers.length} blockers, ${missingIds.length} not submitted`;
+  const text = `${title}: ${plural(summary.people.length, "update")}, ${plural(blockers.length, "blocker")}, ${missingIds.length} not submitted`;
   return { text, blocks };
 }

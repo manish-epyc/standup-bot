@@ -20,6 +20,13 @@ export function formatTeamDate(date: string): string {
   }).format(new Date(`${date}T00:00:00Z`));
 }
 
+/** "2026-10-06" → "October 2026" */
+export function formatMonth(date: string): string {
+  return new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }).format(
+    new Date(`${date}T00:00:00Z`),
+  );
+}
+
 export function isWeekend(date: string): boolean {
   const day = new Date(`${date}T00:00:00Z`).getUTCDay();
   return day === 0 || day === 6;
