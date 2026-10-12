@@ -6,6 +6,7 @@ import { default as nextHandler } from "./.open-next/worker.js";
 // in UTC. MON-FRI rather than 1-5 because cron dialects disagree on whether 1 is Sunday or Monday.
 export const CRON_ROUTES: Record<string, string> = {
   "0 4 * * MON-FRI": "/api/cron/reminder", // 09:30 IST
+  "20 4 * * MON-FRI": "/api/cron/nudge", // 09:50 IST
   "30 4 * * MON-FRI": "/api/cron/summary", // 10:00 IST
 };
 

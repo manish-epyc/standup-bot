@@ -124,3 +124,16 @@ export async function setSummarySlackTs(db: D1Database, date: string, slackTs: s
 export async function releaseSummaryClaim(db: D1Database, date: string): Promise<void> {
   await db.prepare("DELETE FROM summaries WHERE date = ? AND slack_ts IS NULL").bind(date).run();
 }
+
+/** Claims a user's nudge for the day before sending; false when it was already sent. */
+export async function claimNudge(db: D1Database, date: string, userId: string): Promise<boolean> {
+  const result = await db
+    .prepare("INSERT INTO nudges (date, user_id) VALUES (?, ?) ON CONFLICT (date, user_id) DO NOTHING")
+    .bind(date, userId)
+    .run();
+  return result.meta.changes > 0;
+}
+
+export async function releaseNudgeClaim(db: D1Database, date: string, userId: string): Promise<void> {
+  await db.prepare("DELETE FROM nudges WHERE date = ? AND user_id = ?").bind(date, userId).run();
+}
