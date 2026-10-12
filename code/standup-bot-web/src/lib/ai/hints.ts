@@ -1,8 +1,9 @@
 import { getChannelInfo, getChannelMemberIds, listWorkspaceUsers } from "@/lib/slack/api";
 import { truncate } from "@/lib/slack/text";
 
-// Whisper reads at most 224 prompt tokens and silently drops the rest; ~600 characters stays under it.
-const MAX_HINT_CHARS = 600;
+// Whisper reads at most 224 prompt tokens and silently drops the rest; ~500 characters of hints plus
+// the Hinglish style sample added in transcribe.ts stays under it.
+const MAX_HINT_CHARS = 500;
 
 /**
  * Spelling hints for Whisper, read live from Slack so they follow team changes without a deploy:

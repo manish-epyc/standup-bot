@@ -1,6 +1,10 @@
 const GROQ_TRANSCRIPTIONS_URL = "https://api.groq.com/openai/v1/audio/transcriptions";
 const MODEL = "whisper-large-v3";
 
+// Whisper copies the style of its prompt. Without a Roman-script Hinglish sample it writes the Hindi
+// parts of a mixed sentence in Devanagari; with one it keeps English as English and Hindi in Roman.
+const HINGLISH_STYLE = "Kal maine login bug fix kiya, aaj dashboard pe kaam karunga. No blockers hain.";
+
 // Whisper infers the container from the filename extension, not the Content-Type.
 const EXTENSIONS: Record<string, string> = {
   "audio/webm": "webm",
@@ -41,7 +45,7 @@ export async function transcribe(
   form.append("file", new Blob([audio], { type: mimetype }), fileNameForMimetype(mimetype));
   form.append("model", MODEL);
   form.append("response_format", "json");
-  if (hints) form.append("prompt", hints);
+  form.append("prompt", hints ? `${hints} ${HINGLISH_STYLE}` : HINGLISH_STYLE);
 
   const response = await fetch(GROQ_TRANSCRIPTIONS_URL, {
     method: "POST",
