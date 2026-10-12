@@ -1,5 +1,5 @@
 const GROQ_TRANSCRIPTIONS_URL = "https://api.groq.com/openai/v1/audio/transcriptions";
-const MODEL = "whisper-large-v3-turbo";
+const MODEL = "whisper-large-v3";
 
 // Whisper infers the container from the filename extension, not the Content-Type.
 const EXTENSIONS: Record<string, string> = {

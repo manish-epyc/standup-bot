@@ -1,7 +1,7 @@
 import { truncate } from "@/lib/slack/text";
 
 const GROQ_CHAT_URL = "https://api.groq.com/openai/v1/chat/completions";
-const MODEL = "llama-3.3-70b-versatile";
+const MODEL = "qwen/qwen3.8-27b";
 const MAX_LINE = 300;
 
 export type SummaryInput = { userId: string; name: string; transcript: string };
