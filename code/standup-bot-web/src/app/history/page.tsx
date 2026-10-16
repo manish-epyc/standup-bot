@@ -24,17 +24,17 @@ export default async function HistoryPage() {
       <Card>
         <CardHeader>
           <CardTitle>By date</CardTitle>
-          <CardDescription>The most recent days with updates.</CardDescription>
+          <CardDescription>The most recent standup days.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
-          {dates.length === 0 && <p className="text-sm text-muted-foreground">No updates yet.</p>}
+          {dates.length === 0 && <p className="text-sm text-muted-foreground">No standups yet.</p>}
           {dates.map(({ date, count }) => (
             <Link
               key={date}
               href={`/history/${date}`}
               className={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
             >
-              {formatTeamDate(date)} · {count}
+              {count > 0 ? `${formatTeamDate(date)} · ${count}` : formatTeamDate(date)}
             </Link>
           ))}
         </CardContent>

@@ -182,15 +182,31 @@ export async function getUpdatesForDate(db: D1Database, date: string): Promise<U
   return results;
 }
 
-export async function getUpdateDates(
+// A day counts as a standup day when it has updates or a posted summary; a summary's own copy of
+// the day survives even when that day's update rows are gone.
+const STANDUP_DATES = `SELECT date FROM updates UNION SELECT date FROM summaries WHERE slack_ts IS NOT NULL`;
+
+export async function getStandupDates(
   db: D1Database,
   limit: number,
 ): Promise<{ date: string; count: number }[]> {
   const { results } = await db
-    .prepare("SELECT date, COUNT(*) AS count FROM updates GROUP BY date ORDER BY date DESC LIMIT ?")
+    .prepare(
+      `SELECT days.date, (SELECT COUNT(*) FROM updates WHERE updates.date = days.date) AS count
+       FROM (${STANDUP_DATES}) AS days
+       ORDER BY days.date DESC LIMIT ?`,
+    )
     .bind(limit)
     .all<{ date: string; count: number }>();
   return results;
+}
+
+export async function getLatestStandupDateBefore(db: D1Database, date: string): Promise<string | null> {
+  const row = await db
+    .prepare(`SELECT date FROM (${STANDUP_DATES}) WHERE date < ? ORDER BY date DESC LIMIT 1`)
+    .bind(date)
+    .first<{ date: string }>();
+  return row?.date ?? null;
 }
 
 export async function getUpdatesForUser(db: D1Database, userId: string, limit: number): Promise<Update[]> {

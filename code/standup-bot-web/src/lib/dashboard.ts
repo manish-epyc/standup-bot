@@ -1,7 +1,8 @@
 import { teamDate } from "@/lib/date";
 import {
+  getLatestStandupDateBefore,
+  getStandupDates,
   getSummary,
-  getUpdateDates,
   getUpdateDurationsSince,
   getUpdatesForDate,
   getUpdatesForUser,
@@ -27,7 +28,7 @@ export type DayView = {
   namesById: Map<string, string>;
 };
 
-export type TodayDashboard = DayView & { hoursSaved: HoursSaved };
+export type TodayDashboard = DayView & { hoursSaved: HoursSaved; lastStandup: DayView | null };
 
 const HISTORY_LIMIT = 90;
 
@@ -66,11 +67,17 @@ export async function getTodayDashboard(env: CloudflareEnv): Promise<TodayDashbo
   ]);
   // `users` holds every human the bot has seen in the channel, which is the team that would have met.
   const members = users.filter((u) => u.is_active).length;
-  return { ...day, hoursSaved: calculateHoursSaved(monthRows, members, date) };
+
+  let lastStandup: DayView | null = null;
+  if (!day.summary && day.updates.length === 0) {
+    const lastDate = await getLatestStandupDateBefore(env.DB, date);
+    if (lastDate) lastStandup = await getDayView(env, lastDate);
+  }
+  return { ...day, hoursSaved: calculateHoursSaved(monthRows, members, date), lastStandup };
 }
 
 export async function getHistoryIndex(env: CloudflareEnv) {
-  const [dates, users] = await Promise.all([getUpdateDates(env.DB, HISTORY_LIMIT), getUsers(env.DB)]);
+  const [dates, users] = await Promise.all([getStandupDates(env.DB, HISTORY_LIMIT), getUsers(env.DB)]);
   return { dates, users };
 }
 
