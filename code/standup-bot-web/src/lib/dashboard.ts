@@ -182,11 +182,16 @@ export type TodayView = {
   /** Set when today has nothing yet and `day` is the last standup instead. */
   showingLastFrom: string | null;
   standupDates: string[];
+  todaySummarySent: boolean;
 };
 
 export async function getTodayView(env: CloudflareEnv): Promise<TodayView> {
   const today = teamDate(new Date(), env.TEAM_TIMEZONE);
-  const dates = (await getStandupDates(env.DB, HISTORY_DAYS)).map((d) => d.date);
+  const [standupDates, todaySummary] = await Promise.all([
+    getStandupDates(env.DB, HISTORY_DAYS),
+    getSummary(env.DB, today),
+  ]);
+  const dates = standupDates.map((d) => d.date);
   const lastBefore = dates.find((d) => d < today);
   const showLast = !dates.includes(today) && lastBefore !== undefined;
   return {
@@ -194,6 +199,7 @@ export async function getTodayView(env: CloudflareEnv): Promise<TodayView> {
     day: await getDayView(env, showLast ? lastBefore : today),
     showingLastFrom: showLast ? today : null,
     standupDates: dates,
+    todaySummarySent: Boolean(todaySummary?.slack_ts),
   };
 }
 
