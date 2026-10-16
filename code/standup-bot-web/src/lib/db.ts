@@ -217,14 +217,41 @@ export async function getUpdatesForUser(db: D1Database, userId: string, limit: n
   return results;
 }
 
-export async function getUpdateDurationsSince(
+export async function getBlockersForUser(db: D1Database, userId: string, limit: number): Promise<Blocker[]> {
+  const { results } = await db
+    .prepare("SELECT * FROM blockers WHERE user_id = ? ORDER BY date DESC LIMIT ?")
+    .bind(userId, limit)
+    .all<Blocker>();
+  return results;
+}
+
+export async function getUpdateAuthorsSince(
   db: D1Database,
   fromDate: string,
-): Promise<{ date: string; source: UpdateSource; duration_ms: number | null }[]> {
+): Promise<{ date: string; user_id: string }[]> {
   const { results } = await db
-    .prepare("SELECT date, source, duration_ms FROM updates WHERE date >= ?")
+    .prepare("SELECT date, user_id FROM updates WHERE date >= ?")
     .bind(fromDate)
-    .all<{ date: string; source: UpdateSource; duration_ms: number | null }>();
+    .all<{ date: string; user_id: string }>();
+  return results;
+}
+
+export async function getPostedSummariesSince(db: D1Database, fromDate: string): Promise<Summary[]> {
+  const { results } = await db
+    .prepare("SELECT * FROM summaries WHERE date >= ? AND slack_ts IS NOT NULL")
+    .bind(fromDate)
+    .all<Summary>();
+  return results;
+}
+
+export async function getOpenBlockerCountsSince(
+  db: D1Database,
+  fromDate: string,
+): Promise<{ date: string; count: number }[]> {
+  const { results } = await db
+    .prepare("SELECT date, COUNT(*) AS count FROM blockers WHERE date >= ? AND status = 'open' GROUP BY date")
+    .bind(fromDate)
+    .all<{ date: string; count: number }>();
   return results;
 }
 

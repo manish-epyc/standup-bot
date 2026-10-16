@@ -20,6 +20,16 @@ export function formatTeamDate(date: string): string {
   }).format(new Date(`${date}T00:00:00Z`));
 }
 
+/** "2026-10-06" → "Tuesday, 6 October" */
+export function formatLongDate(date: string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    timeZone: "UTC",
+  }).format(new Date(`${date}T00:00:00Z`));
+}
+
 /** "2026-10-06" → "October 2026" */
 export function formatMonth(date: string): string {
   return new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }).format(
